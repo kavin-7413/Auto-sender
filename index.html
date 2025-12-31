@@ -1,0 +1,256 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Scheduler Pro (Local Storage)</title>
+    <style>
+        :root {
+            --wa-green: #25D366;
+            --ig-gradient: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+            --bg: #f0f2f5;
+            --card: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 450px;
+            background: var(--card);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 25px;
+        }
+
+        h1 { font-size: 1.5rem; color: #1c1e21; text-align: center; margin-bottom: 25px; }
+
+        .input-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 6px; color: #444; }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e4e6eb;
+            border-radius: 10px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        input:focus { border-color: #1877f2; outline: none; }
+
+        .btn-add {
+            width: 100%;
+            padding: 14px;
+            background: #1877f2;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .queue-section { margin-top: 30px; }
+        .queue-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+
+        .card {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 15px;
+            position: relative;
+        }
+
+        .platform-tag {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .status-ready { background: #ffc107; color: #000; animation: flash 1s infinite; }
+        .status-pending { background: #6c757d; }
+
+        .msg-text { margin: 10px 0; color: #333; font-size: 0.95rem; }
+        
+        .action-btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+
+        .send-btn { background-color: var(--wa-green); color: white; }
+        .ig-btn { background: var(--ig-gradient); color: white; }
+        .del-btn { background: none; color: #dc3545; font-size: 0.8rem; border: none; cursor: pointer; text-decoration: underline; }
+
+        @keyframes flash {
+            50% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <h1>Post Scheduler</h1>
+
+    <div class="input-group">
+        <label>Select Platform</label>
+        <select id="platform">
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="Instagram">Instagram Story</option>
+        </select>
+    </div>
+
+    <div class="input-group">
+        <label>Message / Caption</label>
+        <textarea id="message" rows="3" placeholder="Enter your text here..."></textarea>
+    </div>
+
+    <div class="input-group">
+        <label>Schedule Date & Time</label>
+        <input type="datetime-local" id="datetime">
+    </div>
+
+    <button class="btn-add" onclick="saveToStorage()">Add to Schedule</button>
+
+    <div class="queue-section">
+        <div class="queue-header">
+            <h3>Your Tasks</h3>
+            <button class="del-btn" onclick="clearAll()">Clear All</button>
+        </div>
+        <div id="displayArea"></div>
+    </div>
+</div>
+
+<script>
+    // Load data from LocalStorage on startup
+    let posts = JSON.parse(localStorage.getItem('scheduled_posts')) || [];
+
+    function saveToStorage() {
+        const platform = document.getElementById('platform').value;
+        const text = document.getElementById('message').value;
+        const time = document.getElementById('datetime').value;
+
+        if (!text || !time) {
+            alert("Please fill in all details");
+            return;
+        }
+
+        const newPost = {
+            id: Date.now(),
+            platform: platform,
+            message: text,
+            targetTime: new Date(time).getTime(),
+            executed: false
+        };
+
+        posts.push(newPost);
+        updateLocalStorage();
+        clearInputs();
+    }
+
+    function updateLocalStorage() {
+        // Sort posts by time before saving
+        posts.sort((a, b) => a.targetTime - b.targetTime);
+        localStorage.setItem('scheduled_posts', JSON.stringify(posts));
+        renderUI();
+    }
+
+    function renderUI() {
+        const display = document.getElementById('displayArea');
+        display.innerHTML = '';
+        const now = new Date().getTime();
+
+        if (posts.length === 0) {
+            display.innerHTML = '<p style="text-align:center; color:#888;">No scheduled posts yet.</p>';
+            return;
+        }
+
+        posts.forEach(post => {
+            const isReady = now >= post.targetTime;
+            const card = document.createElement('div');
+            card.className = 'card';
+            
+            const platformColor = post.platform === 'WhatsApp' ? 'var(--wa-green)' : '#e1306c';
+
+            card.innerHTML = `
+                <span class="platform-tag" style="background:${platformColor}">${post.platform}</span>
+                <span class="platform-tag ${isReady ? 'status-ready' : 'status-pending'}">
+                    ${isReady ? 'READY TO POST' : 'Pending'}
+                </span>
+                <p class="msg-text">${post.message}</p>
+                <small>Scheduled: ${new Date(post.targetTime).toLocaleString()}</small>
+                
+                ${isReady ? `
+                    <button class="action-btn ${post.platform === 'WhatsApp' ? 'send-btn' : 'ig-btn'}" 
+                            onclick="handleAction(${post.id})">
+                        LAUNCH NOW
+                    </button>
+                ` : ''}
+                <center><button class="del-btn" onclick="deletePost(${post.id})">Remove Task</button></center>
+            `;
+            display.appendChild(card);
+        });
+    }
+
+    function handleAction(id) {
+        const post = posts.find(p => p.id === id);
+        if (!post) return;
+
+        if (post.platform === 'WhatsApp') {
+            const waUrl = `https://wa.me/?text=${encodeURIComponent(post.message)}`;
+            window.open(waUrl, '_blank');
+        } else {
+            // Instagram: Copy text and open app
+            navigator.clipboard.writeText(post.message).then(() => {
+                alert("Caption copied! Opening Instagram...");
+                window.open('https://www.instagram.com/reels/create/', '_blank');
+            });
+        }
+
+        // Optional: Remove from list after clicking launch
+        deletePost(id);
+    }
+
+    function deletePost(id) {
+        posts = posts.filter(p => p.id !== id);
+        updateLocalStorage();
+    }
+
+    function clearAll() {
+        if(confirm("Clear all scheduled items?")) {
+            posts = [];
+            updateLocalStorage();
+        }
+    }
+
+    function clearInputs() {
+        document.getElementById('message').value = '';
+        document.getElementById('datetime').value = '';
+    }
+
+    // Refresh the UI every 5 seconds to check if any post becomes "Ready"
+    setInterval(renderUI, 5000);
+
+    // Initial Render
+    renderUI();
+</script>
+
+</body>
+</html>
